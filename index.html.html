@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recloser Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Sarabun',sans-serif;background:#f1f5f9;min-height:100vh;}
+
+.header{background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:20px 28px;color:white;}
+.header h1{font-size:22px;font-weight:700;margin:4px 0;}
+.header .subtitle{font-size:11px;opacity:0.7;letter-spacing:2px;}
+.header .desc{font-size:13px;opacity:0.75;margin-top:4px;}
+
+/* Filter */
+.filter-bar{background:white;padding:16px 28px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fg label{font-size:12px;color:#64748b;font-weight:600;}
+.fg select,.fg input{padding:8px 12px;border-radius:8px;border:1px solid #e2e8f0;font-family:'Sarabun',sans-serif;font-size:13px;outline:none;min-width:160px;}
+.fg select:focus,.fg input:focus{border-color:#1d4ed8;}
+.btn-search{padding:8px 20px;background:#1d4ed8;color:white;border:none;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;cursor:pointer;font-weight:600;align-self:flex-end;}
+.btn-reset{padding:8px 16px;background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;align-self:flex-end;}
+.last-update{font-size:12px;color:#94a3b8;align-self:flex-end;margin-left:auto;}
+
+/* Active filter badge */
+.active-filter{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 14px;font-size:13px;color:#1d4ed8;align-self:flex-end;display:none;}
+
+.loading{display:flex;flex-direction:column;justify-content:center;align-items:center;height:60vh;gap:16px;}
+.spinner{width:48px;height:48px;border:4px solid #e2e8f0;border-top:4px solid #1d4ed8;border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.main{padding:20px 28px;}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+.kpi-card{background:white;border-radius:12px;padding:18px 20px;border-left:4px solid;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.kpi-label{font-size:12px;color:#64748b;margin-bottom:8px;}
+.kpi-value{font-size:32px;font-weight:700;line-height:1;}
+.kpi-unit{font-size:12px;color:#94a3b8;margin-top:4px;}
+
+/* Section header */
+.section-title{font-size:15px;font-weight:700;color:#1e3a8a;margin:24px 0 14px;padding-left:12px;border-left:4px solid #1d4ed8;}
+
+/* Charts */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.charts-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
+.chart-card{background:white;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.chart-title{font-size:14px;font-weight:600;color:#1e3a8a;margin-bottom:4px;}
+.chart-hint{font-size:11px;color:#94a3b8;margin-bottom:12px;}
+.chart-wrap{position:relative;height:220px;}
+.chart-wrap-sm{position:relative;height:180px;}
+
+/* Heatmap */
+.heatmap-wrap{overflow-x:auto;}
+.heatmap{border-collapse:collapse;font-size:12px;width:100%;}
+.heatmap th{padding:6px 10px;text-align:center;background:#f8fafc;color:#64748b;font-weight:600;border:1px solid #e2e8f0;}
+.heatmap td{padding:6px 10px;text-align:center;border:1px solid #e2e8f0;border-radius:4px;font-weight:600;min-width:48px;}
+
+/* Table */
+.table-card{background:white;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;}
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table thead tr{background:#1e3a8a;color:white;}
+.data-table thead th{padding:10px 14px;text-align:left;font-weight:600;}
+.data-table tbody tr:nth-child(even){background:#f8fafc;}
+.data-table tbody tr:hover{background:#eff6ff;cursor:pointer;}
+.data-table tbody td{padding:10px 14px;border-bottom:1px solid #f1f5f9;}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;padding:20px;}
+.modal-overlay.active{display:flex;}
+.modal{background:white;border-radius:16px;width:100%;max-width:900px;max-height:88vh;overflow-y:auto;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+.modal-title{font-size:18px;font-weight:700;color:#1e3a8a;}
+.modal-close{background:none;border:none;font-size:28px;cursor:pointer;color:#64748b;line-height:1;}
+.modal-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.modal-kpi-card{background:#f8fafc;border-radius:10px;padding:14px;text-align:center;}
+.modal-kpi-label{font-size:11px;color:#64748b;margin-bottom:4px;}
+.modal-kpi-value{font-size:24px;font-weight:700;}
+.modal-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.modal-chart-wrap{height:200px;}
+.modal-table{width:100%;border-collapse:collapse;font-size:12px;}
+.modal-table th{background:#1e3a8a;color:white;padding:8px 10px;text-align:left;font-weight:600;}
+.modal-table td{padding:8px 10px;border-bottom:1px solid #f1f5f9;}
+.modal-table tr:nth-child(even) td{background:#f8fafc;}
+
+@media(max-width:768px){
+  .charts-grid,.charts-grid-3{grid-template-columns:1fr;}
+  .modal-kpi{grid-template-columns:1fr 1fr;}
+  .modal-charts{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="subtitle">RECLOSER MONITORING SYSTEM</div>
+  <h1>สถิติการทำงาน Recloser</h1>
+  <div class="desc">กฟจ.สิงห์บุรี — อัปเดตอัตโนมัติจาก Google Sheet</div>
+</div>
+
+<div class="filter-bar">
+  <div class="fg">
+    <label>จุดรวมงาน</label>
+    <select id="filterJunction" onchange="onJunctionChange()">
+      <option value="">ทั้งหมด</option>
+    </select>
+  </div>
+  <div class="fg">
+    <label>กฟฟ.</label>
+    <select id="filterGff" onchange="onGffChange()">
+      <option value="">ทั้งหมด</option>
+    </select>
+  </div>
+  <div class="fg">
+    <label>รหัสอุปกรณ์</label>
+    <select id="filterDevice">
+      <option value="">ทั้งหมด</option>
+    </select>
+  </div>
+  <div class="fg">
+    <label>ตั้งแต่วันที่</label>
+    <input type="date" id="dateFrom">
+  </div>
+  <div class="fg">
+    <label>ถึงวันที่</label>
+    <input type="date" id="dateTo">
+  </div>
+  <button class="btn-search" onclick="applyFilter()">🔍 ค้นหา</button>
+  <button class="btn-reset" onclick="resetFilter()">↺ รีเซ็ต</button>
+  <div class="active-filter" id="activeFilter"></div>
+  <div class="last-update" id="lastUpdate"></div>
+</div>
+
+<div id="loadingDiv" class="loading">
+  <div class="spinner"></div>
+  <div style="color:#64748b">กำลังโหลดข้อมูลจาก Google Sheet...</div>
+</div>
+
+<div id="mainContent" class="main" style="display:none">
+
+  <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi-card" style="border-color:#1d4ed8">
+      <div class="kpi-label">เหตุการณ์ทั้งหมด</div>
+      <div class="kpi-value" id="kpiTotal" style="color:#1d4ed8">-</div>
+      <div class="kpi-unit">ครั้ง</div>
+    </div>
+    <div class="kpi-card" style="border-color:#16a34a">
+      <div class="kpi-label">Reclose สำเร็จ</div>
+      <div class="kpi-value" id="kpiReclose" style="color:#16a34a">-</div>
+      <div class="kpi-unit">ครั้ง</div>
+    </div>
+    <div class="kpi-card" style="border-color:#dc2626">
+      <div class="kpi-label">Lockout</div>
+      <div class="kpi-value" id="kpiLockout" style="color:#dc2626">-</div>
+      <div class="kpi-unit">ครั้ง</div>
+    </div>
+    <div class="kpi-card" style="border-color:#d97706">
+      <div class="kpi-label">กระแสเฉลี่ย</div>
+      <div class="kpi-value" id="kpiCurrent" style="color:#d97706">-</div>
+      <div class="kpi-unit">A</div>
+    </div>
+    <div class="kpi-card" style="border-color:#7c3aed">
+      <div class="kpi-label">กระแสสูงสุด</div>
+      <div class="kpi-value" id="kpiMax" style="color:#7c3aed">-</div>
+      <div class="kpi-unit">A</div>
+    </div>
+  </div>
+
+  <!-- ภาพรวม -->
+  <div class="section-title">📊 ภาพรวมเหตุการณ์</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">แนวโน้มรายเดือน</div>
+      <div class="chart-wrap"><canvas id="lineChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">จำนวนครั้งแยกตามอุปกรณ์</div>
+      <div class="chart-hint">💡 กดที่แท่งกราฟเพื่อดูรายละเอียด</div>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- วิเคราะห์เชิงวิศวกรรม -->
+  <div class="section-title">⚡ วิเคราะห์เชิงวิศวกรรม</div>
+  <div class="charts-grid-3">
+    <div class="chart-card">
+      <div class="chart-title">สัดส่วนตามสาเหตุ</div>
+      <div class="chart-wrap-sm"><canvas id="pieChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">กระแสแยกตามเฟส</div>
+      <div class="chart-hint">ค่าเฉลี่ยกระแส (A) แต่ละเฟส</div>
+      <div class="chart-wrap-sm"><canvas id="phaseChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ช่วงเวลาที่เกิดเหตุ</div>
+      <div class="chart-hint">แยกตามช่วงกลางวัน/กลางคืน</div>
+      <div class="chart-wrap-sm"><canvas id="timeChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">สถานะการทำงาน</div>
+      <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">แนวโน้มสาเหตุรายเดือน</div>
+      <div class="chart-wrap"><canvas id="causeTrendChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="chart-card" style="margin-bottom:16px">
+    <div class="chart-title" style="margin-bottom:12px">🗓️ Heatmap — จำนวนเหตุการณ์ (เดือน × สาเหตุ)</div>
+    <div class="heatmap-wrap" id="heatmapWrap"></div>
+  </div>
+
+  <!-- ตารางสรุปรายอุปกรณ์ -->
+  <div class="section-title">📋 สรุปรายอุปกรณ์</div>
+  <div class="table-card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>รหัสอุปกรณ์</th><th>กฟฟ.</th><th>ทั้งหมด</th>
+          <th>Reclose</th><th>Lockout</th>
+          <th>กระแสเฉลี่ย (A)</th><th>กระแสสูงสุด (A)</th>
+          <th>สาเหตุหลัก</th><th>สถานะรอแก้ไข</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">รายละเอียด</div>
+      <button class="modal-close" onclick="closeModalDirect()">×</button>
+    </div>
+    <div class="modal-kpi">
+      <div class="modal-kpi-card">
+        <div class="modal-kpi-label">ทั้งหมด</div>
+        <div class="modal-kpi-value" id="mTotal" style="color:#1d4ed8">-</div>
+      </div>
+      <div class="modal-kpi-card">
+        <div class="modal-kpi-label">Reclose สำเร็จ</div>
+        <div class="modal-kpi-value" id="mReclose" style="color:#16a34a">-</div>
+      </div>
+      <div class="modal-kpi-card">
+        <div class="modal-kpi-label">Lockout</div>
+        <div class="modal-kpi-value" id="mLockout" style="color:#dc2626">-</div>
+      </div>
+      <div class="modal-kpi-card">
+        <div class="modal-kpi-label">กระแสเฉลี่ย (A)</div>
+        <div class="modal-kpi-value" id="mCurrent" style="color:#d97706">-</div>
+      </div>
+    </div>
+    <div class="modal-charts">
+      <div class="chart-card" style="box-shadow:none;padding:0">
+        <div class="chart-title" style="margin-bottom:8px">สาเหตุการเกิดเหตุ</div>
+        <div class="modal-chart-wrap"><canvas id="modalCauseChart"></canvas></div>
+      </div>
+      <div class="chart-card" style="box-shadow:none;padding:0">
+        <div class="chart-title" style="margin-bottom:8px">กระแสแยกตามเฟส (เฉลี่ย A)</div>
+        <div class="modal-chart-wrap"><canvas id="modalPhaseChart"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-title" style="margin-bottom:10px">รายการเหตุการณ์ทั้งหมด</div>
+    <table class="modal-table">
+      <thead>
+        <tr>
+          <th>วันที่</th><th>เวลา</th><th>รูปแบบ</th><th>สถานะ</th>
+          <th>เฟส</th><th>กระแส (A)</th><th>สาเหตุ</th>
+          <th>รายละเอียด</th><th>สถานะแก้ไข</th>
+        </tr>
+      </thead>
+      <tbody id="modalTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const API_URL="https://script.google.com/macros/s/AKfycbxsUKWGyFFi7kk_1dC7pNk7SOkaEmOSfUM_rZ5NOwt0nqAD6OKYk2K5dUsZlRgFXVpb/exec";
+const CAUSE_COLORS={"นก/สัตว์":"#f97316","ไม่ทราบสาเหตุ":"#6b7280","ต้นไม้/กิ่งไม้":"#22c55e","อุปกรณ์ชำรุด":"#ef4444","บุคคลภายนอก":"#8b5cf6","ทดสอบ":"#3b82f6"};
+const STATUS_COLORS={"Reclose สำเร็จ":"#22c55e","Lockout":"#ef4444","ทดสอบ":"#3b82f6","บำรุงรักษา":"#f59e0b"};
+const MONTHS=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+const HEAT_COLORS=["#f0f9ff","#bae6fd","#7dd3fc","#38bdf8","#0ea5e9","#0284c7","#0369a1"];
+
+let allData=[], charts={}, modalCharts={};
+
+async function loadData(){
+  try{
+    const res=await fetch(API_URL);
+    const json=await res.json();
+    allData=json.data.filter(r=>r["วันที่"]);
+    document.getElementById("lastUpdate").textContent="อัปเดต: "+new Date().toLocaleTimeString("th-TH");
+    setupFilters();
+    document.getElementById("loadingDiv").style.display="none";
+    document.getElementById("mainContent").style.display="block";
+    renderAll(allData);
+  }catch(e){
+    document.getElementById("loadingDiv").innerHTML=`<div style="color:#dc2626">❌ โหลดข้อมูลไม่สำเร็จ<br><small>${e.message}</small></div>`;
+  }
+}
+
+function setupFilters(){
+  const junctions=[...new Set(allData.map(d=>d["กฟฟ.จุดรวมงาน"]))].filter(Boolean).sort();
+  const jSel=document.getElementById("filterJunction");
+  junctions.forEach(j=>jSel.add(new Option(j,j)));
+  const dates=allData.map(d=>d["วันที่"]).sort();
+  document.getElementById("dateFrom").value=dates[0]||"";
+  document.getElementById("dateTo").value=dates[dates.length-1]||"";
+  refreshGffOptions("");
+}
+
+function refreshGffOptions(junction){
+  const gSel=document.getElementById("filterGff");
+  gSel.innerHTML='<option value="">ทั้งหมด</option>';
+  const gffs=[...new Set(allData.filter(d=>!junction||d["กฟฟ.จุดรวมงาน"]===junction).map(d=>d["กฟฟ."]))].filter(Boolean).sort();
+  gffs.forEach(g=>gSel.add(new Option(g,g)));
+}
+
+function refreshDeviceOptions(junction,gff){
+  const dSel=document.getElementById("filterDevice");
+  dSel.innerHTML='<option value="">ทั้งหมด</option>';
+  const devs=[...new Set(allData.filter(d=>(!junction||d["กฟฟ.จุดรวมงาน"]===junction)&&(!gff||d["กฟฟ."]===gff)).map(d=>d["รหัสอุปกรณ์"]))].filter(Boolean).sort();
+  devs.forEach(d=>dSel.add(new Option(d,d)));
+}
+
+function onJunctionChange(){
+  const j=document.getElementById("filterJunction").value;
+  refreshGffOptions(j);
+  refreshDeviceOptions(j,"");
+}
+
+function onGffChange(){
+  const j=document.getElementById("filterJunction").value;
+  const g=document.getElementById("filterGff").value;
+  refreshDeviceOptions(j,g);
+}
+
+function applyFilter(){
+  const junction=document.getElementById("filterJunction").value;
+  const gff=document.getElementById("filterGff").value;
+  const device=document.getElementById("filterDevice").value;
+  const dateFrom=document.getElementById("dateFrom").value;
+  const dateTo=document.getElementById("dateTo").value;
+
+  const filtered=allData.filter(d=>{
+    const date=d["วันที่"];
+    return (!junction||d["กฟฟ.จุดรวมงาน"]===junction)&&
+           (!gff||d["กฟฟ."]===gff)&&
+           (!device||d["รหัสอุปกรณ์"]===device)&&
+           (!dateFrom||date>=dateFrom)&&
+           (!dateTo||date<=dateTo);
+  });
+
+  // แสดง active filter
+  const parts=[];
+  if(junction) parts.push(junction);
+  if(gff) parts.push(gff);
+  if(device) parts.push(device);
+  const af=document.getElementById("activeFilter");
+  if(parts.length){af.textContent="🔍 "+parts.join(" › ");af.style.display="block";}
+  else af.style.display="none";
+
+  renderAll(filtered);
+}
+
+function resetFilter(){
+  document.getElementById("filterJunction").value="";
+  document.getElementById("filterGff").value="";
+  document.getElementById("filterDevice").value="";
+  refreshGffOptions("");
+  refreshDeviceOptions("","");
+  const dates=allData.map(d=>d["วันที่"]).sort();
+  document.getElementById("dateFrom").value=dates[0]||"";
+  document.getElementById("dateTo").value=dates[dates.length-1]||"";
+  document.getElementById("activeFilter").style.display="none";
+  renderAll(allData);
+}
+
+function renderAll(data){
+  updateKPI(data);
+  updateLineChart(data);
+  updateBarChart(data);
+  updatePieChart(data);
+  updatePhaseChart(data);
+  updateTimeChart(data);
+  updateStatusChart(data);
+  updateCauseTrendChart(data);
+  updateHeatmap(data);
+  updateTable(data);
+}
+
+function updateKPI(data){
+  const reclose=data.filter(d=>d["สถานะ"]&&d["สถานะ"].includes("Reclose"));
+  const lockout=data.filter(d=>d["สถานะ"]==="Lockout");
+  const currents=data.map(d=>parseFloat(d["กระแส (A)"])).filter(v=>v>0);
+  const avg=currents.length?Math.round(currents.reduce((s,v)=>s+v,0)/currents.length):0;
+  const max=currents.length?Math.max(...currents):0;
+  document.getElementById("kpiTotal").textContent=data.length;
+  document.getElementById("kpiReclose").textContent=reclose.length;
+  document.getElementById("kpiLockout").textContent=lockout.length;
+  document.getElementById("kpiCurrent").textContent=avg.toLocaleString();
+  document.getElementById("kpiMax").textContent=max.toLocaleString();
+}
+
+function mkChart(id,type,data,options){
+  const el=document.getElementById(id);
+  if(charts[id]) charts[id].destroy();
+  charts[id]=new Chart(el,{type,data,options:{responsive:true,maintainAspectRatio:false,...options}});
+}
+
+function updateLineChart(data){
+  const mc={};
+  data.forEach(d=>{const m=new Date(d["วันที่"]).getMonth();mc[m]=(mc[m]||0)+1;});
+  const ms=Object.keys(mc).sort((a,b)=>a-b);
+  mkChart("lineChart","line",{
+    labels:ms.map(m=>MONTHS[m]),
+    datasets:[{label:"จำนวนครั้ง",data:ms.map(m=>mc[m]),borderColor:"#1d4ed8",backgroundColor:"rgba(29,78,216,0.1)",borderWidth:2.5,pointRadius:5,pointBackgroundColor:"#1d4ed8",fill:true,tension:0.3}]
+  },{plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+}
+
+function updateBarChart(data){
+  const dc={};
+  data.forEach(d=>{if(d["รหัสอุปกรณ์"])dc[d["รหัสอุปกรณ์"]]=(dc[d["รหัสอุปกรณ์"]]||0)+1;});
+  const sorted=Object.entries(dc).sort((a,b)=>b[1]-a[1]);
+  if(charts["barChart"]) charts["barChart"].destroy();
+  charts["barChart"]=new Chart(document.getElementById("barChart"),{
+    type:"bar",
+    data:{labels:sorted.map(([k])=>k),datasets:[{label:"จำนวนครั้ง",data:sorted.map(([,v])=>v),backgroundColor:"#1d4ed8",hoverBackgroundColor:"#1e40af",borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{beginAtZero:true}},
+      onClick:(evt,els)=>{if(els.length>0)openModal(sorted[els[0].index][0],data);},
+      onHover:(evt,els)=>{evt.native.target.style.cursor=els.length?"pointer":"default";}
+    }
+  });
+}
+
+function updatePieChart(data){
+  const cc={};
+  data.forEach(d=>{if(d["สาเหตุ"])cc[d["สาเหตุ"]]=(cc[d["สาเหตุ"]]||0)+1;});
+  const sorted=Object.entries(cc).sort((a,b)=>b[1]-a[1]);
+  mkChart("pieChart","pie",{
+    labels:sorted.map(([k])=>k),
+    datasets:[{data:sorted.map(([,v])=>v),backgroundColor:sorted.map(([k])=>CAUSE_COLORS[k]||"#94a3b8"),borderWidth:2,borderColor:"#fff"}]
+  },{plugins:{legend:{position:"bottom",labels:{font:{family:"Sarabun"},boxWidth:12,padding:8}}}});
+}
+
+function updatePhaseChart(data){
+  // จัดกลุ่มเฟสหลัก
+  const phaseMap={"A/G":[],"B/G":[],"C/G":[],"A/B/G":[],"อื่นๆ":[]};
+  data.forEach(d=>{
+    const v=parseFloat(d["กระแส (A)"]);
+    const ph=d["เฟส"]||"";
+    if(!v||v<=0) return;
+    if(phaseMap[ph]!==undefined) phaseMap[ph].push(v);
+    else phaseMap["อื่นๆ"].push(v);
+  });
+  const labels=Object.keys(phaseMap).filter(k=>phaseMap[k].length>0);
+  const avgs=labels.map(k=>{const arr=phaseMap[k];return arr.length?Math.round(arr.reduce((s,v)=>s+v,0)/arr.length):0;});
+  mkChart("phaseChart","bar",{
+    labels,
+    datasets:[{label:"กระแสเฉลี่ย (A)",data:avgs,backgroundColor:["#ef4444","#f97316","#eab308","#22c55e","#94a3b8"],borderRadius:6}]
+  },{plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+}
+
+function updateTimeChart(data){
+  const slots={"00-06":0,"06-12":0,"12-18":0,"18-24":0};
+  data.forEach(d=>{
+    const t=d["เวลา"]||"";
+    const h=parseInt(t.split(":")[0])||0;
+    if(h<6) slots["00-06"]++;
+    else if(h<12) slots["06-12"]++;
+    else if(h<18) slots["12-18"]++;
+    else slots["18-24"]++;
+  });
+  mkChart("timeChart","doughnut",{
+    labels:["ดึก (00-06น.)","เช้า (06-12น.)","บ่าย (12-18น.)","เย็น (18-24น.)"],
+    datasets:[{data:Object.values(slots),backgroundColor:["#1e3a8a","#f97316","#eab308","#6b7280"],borderWidth:2,borderColor:"#fff"}]
+  },{plugins:{legend:{position:"bottom",labels:{font:{family:"Sarabun"},boxWidth:12,padding:6}}}});
+}
+
+function updateStatusChart(data){
+  const sc={};
+  data.forEach(d=>{if(d["สถานะ"])sc[d["สถานะ"]]=(sc[d["สถานะ"]]||0)+1;});
+  mkChart("statusChart","bar",{
+    labels:Object.keys(sc),
+    datasets:[{data:Object.values(sc),backgroundColor:Object.keys(sc).map(k=>STATUS_COLORS[k]||"#94a3b8"),borderRadius:6}]
+  },{plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+}
+
+function updateCauseTrendChart(data){
+  const causes=[...new Set(data.map(d=>d["สาเหตุ"]).filter(Boolean))].slice(0,4);
+  const months=[...new Set(data.map(d=>new Date(d["วันที่"]).getMonth()))].sort((a,b)=>a-b);
+  const datasets=causes.map(c=>({
+    label:c,
+    data:months.map(m=>data.filter(d=>new Date(d["วันที่"]).getMonth()===m&&d["สาเหตุ"]===c).length),
+    borderColor:CAUSE_COLORS[c]||"#94a3b8",
+    backgroundColor:(CAUSE_COLORS[c]||"#94a3b8")+"33",
+    borderWidth:2,pointRadius:4,tension:0.3,fill:false,
+  }));
+  mkChart("causeTrendChart","line",{labels:months.map(m=>MONTHS[m]),datasets},{
+    plugins:{legend:{position:"bottom",labels:{font:{family:"Sarabun"},boxWidth:12}}},
+    scales:{x:{grid:{display:false}},y:{beginAtZero:true}}
+  });
+}
+
+function updateHeatmap(data){
+  const causes=[...new Set(data.map(d=>d["สาเหตุ"]).filter(Boolean))].sort();
+  const months=[...new Set(data.map(d=>new Date(d["วันที่"]).getMonth()))].sort((a,b)=>a-b);
+  const maxVal=Math.max(...months.flatMap(m=>causes.map(c=>data.filter(d=>new Date(d["วันที่"]).getMonth()===m&&d["สาเหตุ"]===c).length)));
+
+  let html='<table class="heatmap"><thead><tr><th>สาเหตุ \\ เดือน</th>';
+  months.forEach(m=>html+=`<th>${MONTHS[m]}</th>`);
+  html+='<th>รวม</th></tr></thead><tbody>';
+  causes.forEach(c=>{
+    html+=`<tr><td style="text-align:left;padding:6px 12px;font-weight:600">${c}</td>`;
+    let rowTotal=0;
+    months.forEach(m=>{
+      const v=data.filter(d=>new Date(d["วันที่"]).getMonth()===m&&d["สาเหตุ"]===c).length;
+      rowTotal+=v;
+      const idx=maxVal>0?Math.min(Math.floor((v/maxVal)*6),6):0;
+      const bg=HEAT_COLORS[idx];
+      const fg=idx>=3?"white":"#1e3a8a";
+      html+=`<td style="background:${bg};color:${fg}">${v||""}</td>`;
+    });
+    html+=`<td style="font-weight:700;color:#1e3a8a">${rowTotal}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById("heatmapWrap").innerHTML=html;
+}
+
+function updateTable(data){
+  const dm={};
+  data.forEach(d=>{
+    const dev=d["รหัสอุปกรณ์"];
+    if(!dev) return;
+    if(!dm[dev]) dm[dev]={gff:d["กฟฟ."],rows:[]};
+    dm[dev].rows.push(d);
+  });
+  const tbody=document.getElementById("tableBody");
+  tbody.innerHTML="";
+  Object.entries(dm).sort((a,b)=>b[1].rows.length-a[1].rows.length).forEach(([dev,info])=>{
+    const rows=info.rows;
+    const reclose=rows.filter(r=>r["สถานะ"]&&r["สถานะ"].includes("Reclose")).length;
+    const lockout=rows.filter(r=>r["สถานะ"]==="Lockout").length;
+    const currents=rows.map(r=>parseFloat(r["กระแส (A)"])).filter(v=>v>0);
+    const avg=currents.length?Math.round(currents.reduce((s,v)=>s+v,0)/currents.length):"-";
+    const max=currents.length?Math.max(...currents):"-";
+    const cm={};rows.forEach(r=>{if(r["สาเหตุ"])cm[r["สาเหตุ"]]=(cm[r["สาเหตุ"]]||0)+1;});
+    const topCause=Object.entries(cm).sort((a,b)=>b[1]-a[1])[0]?.[0]||"-";
+    const color=CAUSE_COLORS[topCause]||"#94a3b8";
+    const pending=rows.filter(r=>r["สถานะการแก้ไข"]&&r["สถานะการแก้ไข"].includes("รอ")).length;
+    tbody.innerHTML+=`
+      <tr onclick="openModal('${dev}',null)">
+        <td><strong style="color:#1d4ed8">${dev}</strong></td>
+        <td style="color:#475569">${info.gff||"-"}</td>
+        <td><strong>${rows.length}</strong></td>
+        <td style="color:#16a34a">${reclose}</td>
+        <td style="color:#dc2626">${lockout}</td>
+        <td>${avg}</td><td>${max}</td>
+        <td><span class="badge" style="background:${color}22;color:${color}">${topCause}</span></td>
+        <td>${pending>0?`<span style="color:#dc2626;font-weight:600">${pending} รายการ</span>`:'<span style="color:#16a34a">-</span>'}</td>
+      </tr>`;
+  });
+}
+
+function openModal(device,currentData){
+  const data=currentData||allData;
+  const rows=data.filter(d=>d["รหัสอุปกรณ์"]===device).sort((a,b)=>b["วันที่"].localeCompare(a["วันที่"]));
+  const reclose=rows.filter(r=>r["สถานะ"]&&r["สถานะ"].includes("Reclose")).length;
+  const lockout=rows.filter(r=>r["สถานะ"]==="Lockout").length;
+  const currents=rows.map(r=>parseFloat(r["กระแส (A)"])).filter(v=>v>0);
+  const avg=currents.length?Math.round(currents.reduce((s,v)=>s+v,0)/currents.length):0;
+
+  document.getElementById("modalTitle").textContent=`📌 ${device} — ${rows[0]?.["กฟฟ."]||""}`;
+  document.getElementById("mTotal").textContent=rows.length;
+  document.getElementById("mReclose").textContent=reclose;
+  document.getElementById("mLockout").textContent=lockout;
+  document.getElementById("mCurrent").textContent=avg.toLocaleString();
+
+  // สาเหตุ
+  const cm={};rows.forEach(r=>{if(r["สาเหตุ"])cm[r["สาเหตุ"]]=(cm[r["สาเหตุ"]]||0)+1;});
+  const sc=Object.entries(cm).sort((a,b)=>b[1]-a[1]);
+  if(modalCharts.cause) modalCharts.cause.destroy();
+  modalCharts.cause=new Chart(document.getElementById("modalCauseChart"),{
+    type:"bar",
+    data:{labels:sc.map(([k])=>k),datasets:[{data:sc.map(([,v])=>v),backgroundColor:sc.map(([k])=>CAUSE_COLORS[k]||"#94a3b8"),borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}
+  });
+
+  // เฟส
+  const phaseMap={"A/G":[],"B/G":[],"C/G":[],"อื่นๆ":[]};
+  rows.forEach(d=>{const v=parseFloat(d["กระแส (A)"]);const ph=d["เฟส"]||"";if(!v||v<=0)return;if(phaseMap[ph]!==undefined)phaseMap[ph].push(v);else phaseMap["อื่นๆ"].push(v);});
+  const pLabels=Object.keys(phaseMap).filter(k=>phaseMap[k].length>0);
+  const pAvgs=pLabels.map(k=>{const arr=phaseMap[k];return arr.length?Math.round(arr.reduce((s,v)=>s+v,0)/arr.length):0;});
+  if(modalCharts.phase) modalCharts.phase.destroy();
+  modalCharts.phase=new Chart(document.getElementById("modalPhaseChart"),{
+    type:"bar",
+    data:{labels:pLabels,datasets:[{data:pAvgs,backgroundColor:["#ef4444","#f97316","#eab308","#94a3b8"],borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}
+  });
+
+  // ตาราง
+  document.getElementById("modalTableBody").innerHTML=rows.map(r=>`
+    <tr>
+      <td>${r["วันที่"]||"-"}</td><td>${r["เวลา"]||"-"}</td>
+      <td>${r["รูปแบบการทำงาน"]||"-"}</td>
+      <td style="color:${STATUS_COLORS[r["สถานะ"]]||"#333"}">${r["สถานะ"]||"-"}</td>
+      <td>${r["เฟส"]||"-"}</td><td>${r["กระแส (A)"]||"-"}</td>
+      <td>${r["สาเหตุ"]||"-"}</td>
+      <td style="max-width:180px;word-break:break-word;font-size:11px">${r["รายละเอียด"]||"-"}</td>
+      <td>${r["สถานะการแก้ไข"]||"-"}</td>
+    </tr>`).join("");
+
+  document.getElementById("modalOverlay").classList.add("active");
+}
+
+function closeModal(e){if(e.target===document.getElementById("modalOverlay"))closeModalDirect();}
+function closeModalDirect(){document.getElementById("modalOverlay").classList.remove("active");}
+
+loadData();
+setInterval(loadData,5*60*1000);
+</script>
+</body>
+</html>
