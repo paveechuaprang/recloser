@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recloser Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Sarabun',sans-serif;background:#f1f5f9;min-height:100vh;}
+.header{background:linear-gradient(135deg,#1e3a8a,#1d4ed8);padding:20px 28px;color:white;}
+.header h1{font-size:22px;font-weight:700;margin:4px 0;}
+.header .subtitle{font-size:11px;opacity:0.7;letter-spacing:2px;}
+.header .desc{font-size:13px;opacity:0.75;margin-top:4px;}
+.filter-bar{background:white;padding:14px 28px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fg label{font-size:11px;color:#64748b;font-weight:600;}
+.fg select,.fg input{padding:7px 10px;border-radius:8px;border:1px solid #e2e8f0;font-family:'Sarabun',sans-serif;font-size:13px;outline:none;min-width:140px;}
+.fg select:focus,.fg input:focus{border-color:#1d4ed8;}
+.btn{padding:7px 16px;border:none;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;font-weight:600;align-self:flex-end;}
+.btn-search{background:#1d4ed8;color:white;}
+.btn-reset{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;}
+.active-filter{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;font-size:12px;color:#1d4ed8;align-self:flex-end;display:none;}
+.last-update{font-size:11px;color:#94a3b8;align-self:flex-end;margin-left:auto;}
+.loading{display:flex;flex-direction:column;justify-content:center;align-items:center;height:60vh;gap:16px;}
+.spinner{width:48px;height:48px;border:4px solid #e2e8f0;border-top:4px solid #1d4ed8;border-radius:50%;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.main{padding:20px 28px;}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+.kpi-card{background:white;border-radius:12px;padding:16px 18px;border-left:4px solid;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.kpi-label{font-size:11px;color:#64748b;margin-bottom:6px;}
+.kpi-value{font-size:28px;font-weight:700;line-height:1;}
+.kpi-unit{font-size:11px;color:#94a3b8;margin-top:3px;}
+.section-title{font-size:15px;font-weight:700;color:#1e3a8a;margin:20px 0 12px;padding-left:12px;border-left:4px solid #1d4ed8;}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.charts-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;}
+.chart-card{background:white;border-radius:12px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.chart-title{font-size:13px;font-weight:600;color:#1e3a8a;margin-bottom:4px;}
+.chart-hint{font-size:11px;color:#94a3b8;margin-bottom:10px;}
+.chart-wrap{position:relative;height:210px;}
+.chart-wrap-sm{position:relative;height:170px;}
+
+/* Current Analysis */
+.current-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+.curr-stat{background:#f8fafc;border-radius:10px;padding:12px;text-align:center;border:1px solid #e2e8f0;}
+.curr-stat-label{font-size:11px;color:#64748b;margin-bottom:4px;}
+.curr-stat-value{font-size:20px;font-weight:700;color:#1e3a8a;}
+.curr-stat-sub{font-size:10px;color:#94a3b8;margin-top:2px;}
+
+/* Table */
+.table-card{background:white;border-radius:12px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:14px;}
+.table-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+.table-toolbar select{padding:6px 10px;border-radius:8px;border:1px solid #e2e8f0;font-family:'Sarabun',sans-serif;font-size:12px;outline:none;}
+.btn-export{padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:12px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px;}
+.btn-export:hover{background:#15803d;}
+.data-table{width:100%;border-collapse:collapse;font-size:12px;}
+.data-table thead tr{background:#1e3a8a;color:white;}
+.data-table thead th{padding:9px 12px;text-align:left;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap;}
+.data-table thead th:hover{background:#1d4ed8;}
+.sort-icon{margin-left:4px;opacity:0.6;}
+.data-table tbody tr:nth-child(even){background:#f8fafc;}
+.data-table tbody tr:hover{background:#eff6ff;cursor:pointer;}
+.data-table tbody td{padding:9px 12px;border-bottom:1px solid #f1f5f9;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;padding:16px;}
+.modal-overlay.active{display:flex;}
+.modal{background:white;border-radius:16px;width:100%;max-width:920px;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.modal-title{font-size:17px;font-weight:700;color:#1e3a8a;}
+.modal-close{background:none;border:none;font-size:26px;cursor:pointer;color:#64748b;line-height:1;}
+.modal-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.modal-kpi-card{background:#f8fafc;border-radius:10px;padding:12px;text-align:center;}
+.modal-kpi-label{font-size:11px;color:#64748b;margin-bottom:3px;}
+.modal-kpi-value{font-size:22px;font-weight:700;}
+.modal-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.modal-chart-wrap{height:180px;}
+.modal-table-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.modal-table{width:100%;border-collapse:collapse;font-size:12px;}
+.modal-table th{background:#1e3a8a;color:white;padding:8px 10px;text-align:left;font-weight:600;cursor:pointer;}
+.modal-table th:hover{background:#1d4ed8;}
+.modal-table td{padding:8px 10px;border-bottom:1px solid #f1f5f9;}
+.modal-table tr:nth-child(even) td{background:#f8fafc;}
+.pagination{display:flex;gap:6px;align-items:center;margin-top:10px;justify-content:flex-end;}
+.page-btn{padding:4px 10px;border:1px solid #e2e8f0;background:white;border-radius:6px;cursor:pointer;font-size:12px;font-family:'Sarabun',sans-serif;}
+.page-btn.active{background:#1d4ed8;color:white;border-color:#1d4ed8;}
+.page-btn:hover:not(.active){background:#f1f5f9;}
+
+/* Histogram bins */
+.hist-bar-wrap{display:flex;align-items:flex-end;gap:2px;height:100px;padding:0 4px;}
+.hist-bar{flex:1;background:#1d4ed8;border-radius:3px 3px 0 0;position:relative;cursor:pointer;transition:opacity 0.2s;}
+.hist-bar:hover{opacity:0.8;}
+.hist-bar.mode-bar{background:#dc2626;}
+.hist-label{font-size:9px;color:#64748b;text-align:center;margin-top:4px;}
+
+@media(max-width:768px){.charts-grid,.charts-grid-3{grid-template-columns:1fr;}.modal-kpi{grid-template-columns:1fr 1fr;}.modal-charts{grid-template-columns:1fr;}.current-stats{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="subtitle">RECLOSER MONITORING SYSTEM</div>
+  <h1>สถิติการทำงาน Recloser</h1>
+  <div class="desc">กฟจ.สิงห์บุรี — อัปเดตอัตโนมัติจาก Google Sheet</div>
+</div>
+
+<div class="filter-bar">
+  <div class="fg"><label>จุดรวมงาน</label>
+    <select id="filterJunction" onchange="onJunctionChange()"><option value="">ทั้งหมด</option></select></div>
+  <div class="fg"><label>กฟฟ.</label>
+    <select id="filterGff" onchange="onGffChange()"><option value="">ทั้งหมด</option></select></div>
+  <div class="fg"><label>รหัสอุปกรณ์</label>
+    <select id="filterDevice"><option value="">ทั้งหมด</option></select></div>
+  <div class="fg"><label>ตั้งแต่วันที่</label><input type="date" id="dateFrom"></div>
+  <div class="fg"><label>ถึงวันที่</label><input type="date" id="dateTo"></div>
+  <button class="btn btn-search" onclick="applyFilter()">🔍 ค้นหา</button>
+  <button class="btn btn-reset" onclick="resetFilter()">↺ รีเซ็ต</button>
+  <div class="active-filter" id="activeFilter"></div>
+  <div class="last-update" id="lastUpdate"></div>
+</div>
+
+<div id="loadingDiv" class="loading">
+  <div class="spinner"></div>
+  <div style="color:#64748b">กำลังโหลดข้อมูลจาก Google Sheet...</div>
+</div>
+
+<div id="mainContent" class="main" style="display:none">
+  <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi-card" style="border-color:#1d4ed8">
+      <div class="kpi-label">เหตุการณ์ทั้งหมด</div>
+      <div class="kpi-value" id="kpiTotal" style="color:#1d4ed8">-</div>
+      <div class="kpi-unit">ครั้ง</div>
+    </div>
+    <div class="kpi-card" style="border-color:#16a34a">
+      <div class="kpi-label">Reclose สำเร็จ</div>
+      <div class="kpi-value" id="kpiReclose" style="color:#16a34a">-</div>
+      <div class="kpi-unit">ครั้ง</div>
+    </div>
+    <div class="kpi-card" style="border-color:#dc2626">
+      <div class="kpi-label">Lockout</div>
+      <div class="kpi-value" id="kpiLockout" style="color:#dc2626">-</div>
+      <div class="kpi-unit">ครั้ง</div>
+    </div>
+    <div class="kpi-card" style="border-color:#7c3aed">
+      <div class="kpi-label">กระแส Mode</div>
+      <div class="kpi-value" id="kpiMode" style="color:#7c3aed">-</div>
+      <div class="kpi-unit">A (ค่าที่เกิดบ่อยสุด)</div>
+    </div>
+    <div class="kpi-card" style="border-color:#d97706">
+      <div class="kpi-label">กระแสสูงสุด</div>
+      <div class="kpi-value" id="kpiMax" style="color:#d97706">-</div>
+      <div class="kpi-unit">A</div>
+    </div>
+    <div class="kpi-card" style="border-color:#0891b2">
+      <div class="kpi-label">กระแสเฉลี่ย</div>
+      <div class="kpi-value" id="kpiAvg" style="color:#0891b2">-</div>
+      <div class="kpi-unit">A</div>
+    </div>
+  </div>
+
+  <!-- ภาพรวม -->
+  <div class="section-title">📊 ภาพรวมเหตุการณ์</div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">แนวโน้มรายเดือน</div>
+      <div class="chart-wrap"><canvas id="lineChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">จำนวนครั้งแยกตามอุปกรณ์</div>
+      <div class="chart-hint">💡 กดที่แท่งกราฟเพื่อดูรายละเอียด</div>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- กระแส -->
+  <div class="section-title">⚡ วิเคราะห์กระแส (Current Analysis)</div>
+  <div class="chart-card" style="margin-bottom:14px">
+    <div class="chart-title">การกระจายตัวของกระแส (Histogram)</div>
+    <div class="chart-hint">🔴 แท่งสีแดง = ช่วงกระแสที่เกิดบ่อยที่สุด (Mode Range) — ช่วย identify ระดับกระแสที่เป็นปัญหาซ้ำๆ</div>
+    <div class="current-stats" id="currentStats"></div>
+    <div class="chart-wrap" style="height:180px"><canvas id="histChart"></canvas></div>
+  </div>
+
+  <!-- วิเคราะห์เชิงวิศวกรรม -->
+  <div class="section-title">🔬 วิเคราะห์เชิงวิศวกรรม</div>
+  <div class="charts-grid-3">
+    <div class="chart-card">
+      <div class="chart-title">สัดส่วนตามสาเหตุ</div>
+      <div class="chart-wrap-sm"><canvas id="pieChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">กระแสเฉลี่ยแยกตามเฟส (A)</div>
+      <div class="chart-wrap-sm"><canvas id="phaseChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">ช่วงเวลาที่เกิดเหตุ</div>
+      <div class="chart-wrap-sm"><canvas id="timeChart"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">สถานะการทำงาน</div>
+      <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">แนวโน้มสาเหตุรายเดือน</div>
+      <div class="chart-wrap"><canvas id="causeTrendChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Heatmap -->
+  <div class="chart-card" style="margin-bottom:14px">
+    <div class="chart-title" style="margin-bottom:10px">🗓️ Heatmap — เหตุการณ์ (เดือน × สาเหตุ)</div>
+    <div style="overflow-x:auto" id="heatmapWrap"></div>
+  </div>
+
+  <!-- ตาราง -->
+  <div class="section-title">📋 สรุปรายอุปกรณ์</div>
+  <div class="table-card">
+    <div class="table-toolbar">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="tblWorktype" onchange="applyTableFilter()">
+          <option value="">ทุกรูปแบบการทำงาน</option>
+          <option>T/R1</option><option>T/R2</option><option>T/L</option>
+        </select>
+        <select id="tblStatus" onchange="applyTableFilter()">
+          <option value="">ทุกสถานะ</option>
+          <option>Reclose สำเร็จ</option><option>Lockout</option><option>ทดสอบ</option>
+        </select>
+        <select id="tblSort" onchange="applyTableFilter()">
+          <option value="count_desc">เรียงตามจำนวน (มาก→น้อย)</option>
+          <option value="count_asc">เรียงตามจำนวน (น้อย→มาก)</option>
+          <option value="device_asc">เรียงตามรหัสอุปกรณ์ (A→Z)</option>
+          <option value="device_desc">เรียงตามรหัสอุปกรณ์ (Z→A)</option>
+          <option value="current_desc">เรียงตามกระแสสูงสุด (มาก→น้อย)</option>
+          <option value="lockout_desc">เรียงตาม Lockout (มาก→น้อย)</option>
+        </select>
+      </div>
+      <button class="btn-export" onclick="exportMainTable()">
+        📥 Export Excel
+      </button>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>รหัสอุปกรณ์</th><th>กฟฟ.</th><th>ทั้งหมด</th>
+          <th>Reclose</th><th>Lockout</th>
+          <th>กระแส Mode (A)</th><th>กระแสสูงสุด (A)</th>
+          <th>สาเหตุหลัก</th><th>รอแก้ไข</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- รายการทั้งหมด -->
+  <div class="section-title">📄 รายการเหตุการณ์ทั้งหมด</div>
+  <div class="table-card">
+    <div class="table-toolbar">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="evtSort" onchange="renderEventTable()">
+          <option value="date_desc">วันที่ล่าสุดก่อน</option>
+          <option value="date_asc">วันที่เก่าก่อน</option>
+          <option value="current_desc">กระแสสูงสุดก่อน</option>
+          <option value="device_asc">เรียงตามอุปกรณ์</option>
+        </select>
+        <span id="evtCount" style="font-size:12px;color:#64748b"></span>
+      </div>
+      <button class="btn-export" onclick="exportEventTable()">📥 Export Excel</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>วันที่</th><th>เวลา</th><th>กฟฟ.</th><th>รหัสอุปกรณ์</th>
+            <th>รูปแบบ</th><th>สถานะ</th><th>เฟส</th>
+            <th>กระแส (A)</th><th>สาเหตุ</th><th>รายละเอียด</th><th>สถานะแก้ไข</th>
+          </tr>
+        </thead>
+        <tbody id="eventTableBody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">รายละเอียด</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-export" onclick="exportModalData()" style="font-size:11px;padding:5px 10px">📥 Export</button>
+        <button class="modal-close" onclick="closeModalDirect()">×</button>
+      </div>
+    </div>
+    <div class="modal-kpi">
+      <div class="modal-kpi-card"><div class="modal-kpi-label">ทั้งหมด</div><div class="modal-kpi-value" id="mTotal" style="color:#1d4ed8">-</div></div>
+      <div class="modal-kpi-card"><div class="modal-kpi-label">Reclose สำเร็จ</div><div class="modal-kpi-value" id="mReclose" style="color:#16a34a">-</div></div>
+      <div class="modal-kpi-card"><div class="modal-kpi-label">Lockout</div><div class="modal-kpi-value" id="mLockout" style="color:#dc2626">-</div></div>
+      <div class="modal-kpi-card"><div class="modal-kpi-label">กระแส Mode (A)</div><div class="modal-kpi-value" id="mMode" style="color:#7c3aed">-</div></div>
+    </div>
+    <div class="modal-charts">
+      <div class="chart-card" style="box-shadow:none;padding:0">
+        <div class="chart-title" style="margin-bottom:6px">สาเหตุการเกิดเหตุ</div>
+        <div class="modal-chart-wrap"><canvas id="modalCauseChart"></canvas></div>
+      </div>
+      <div class="chart-card" style="box-shadow:none;padding:0">
+        <div class="chart-title" style="margin-bottom:6px">Histogram กระแส</div>
+        <div class="modal-chart-wrap"><canvas id="modalHistChart"></canvas></div>
+      </div>
+    </div>
+    <div class="modal-table-toolbar">
+      <div style="font-size:13px;font-weight:600;color:#1e3a8a">รายการเหตุการณ์ทั้งหมด</div>
+      <select id="modalSort" onchange="renderModalTable()" style="padding:5px 8px;border-radius:6px;border:1px solid #e2e8f0;font-family:'Sarabun',sans-serif;font-size:12px;outline:none">
+        <option value="date_desc">วันที่ล่าสุดก่อน</option>
+        <option value="date_asc">วันที่เก่าก่อน</option>
+        <option value="current_desc">กระแสสูงสุดก่อน</option>
+      </select>
+    </div>
+    <table class="modal-table">
+      <thead><tr>
+        <th>วันที่</th><th>เวลา</th><th>รูปแบบ</th><th>สถานะ</th>
+        <th>เฟส</th><th>กระแส (A)</th><th>สาเหตุ</th><th>รายละเอียด</th><th>สถานะแก้ไข</th>
+      </tr></thead>
+      <tbody id="modalTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const API_URL="https://script.google.com/macros/s/AKfycbxsUKWGyFFi7kk_1dC7pNk7SOkaEmOSfUM_rZ5NOwt0nqAD6OKYk2K5dUsZlRgFXVpb/exec";
+const CAUSE_COLORS={"นก/สัตว์":"#f97316","ไม่ทราบสาเหตุ":"#6b7280","ต้นไม้/กิ่งไม้":"#22c55e","อุปกรณ์ชำรุด":"#ef4444","บุคคลภายนอก":"#8b5cf6","ทดสอบ":"#3b82f6"};
+const STATUS_COLORS={"Reclose สำเร็จ":"#22c55e","Lockout":"#ef4444","ทดสอบ":"#3b82f6","บำรุงรักษา":"#f59e0b"};
+const MONTHS=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+const HEAT_COLORS=["#f0f9ff","#bae6fd","#7dd3fc","#38bdf8","#0ea5e9","#0284c7","#0369a1"];
+
+let allData=[], filteredData=[], charts={}, modalCharts={};
+let currentModalDevice="", currentModalRows=[];
+let evtPage=1; const EVT_PER_PAGE=20;
+
+// ── Load Data ──
+async function loadData(){
+  try{
+    const res=await fetch(API_URL);
+    const json=await res.json();
+    allData=json.data.filter(r=>r["วันที่"]);
+    document.getElementById("lastUpdate").textContent="อัปเดต: "+new Date().toLocaleTimeString("th-TH");
+    setupFilters();
+    document.getElementById("loadingDiv").style.display="none";
+    document.getElementById("mainContent").style.display="block";
+    filteredData=[...allData];
+    renderAll(filteredData);
+  }catch(e){
+    document.getElementById("loadingDiv").innerHTML=`<div style="color:#dc2626">❌ โหลดข้อมูลไม่สำเร็จ<br><small>${e.message}</small></div>`;
+  }
+}
+
+function setupFilters(){
+  const junctions=[...new Set(allData.map(d=>d["กฟฟ.จุดรวมงาน"]))].filter(Boolean).sort();
+  const jSel=document.getElementById("filterJunction");
+  junctions.forEach(j=>jSel.add(new Option(j,j)));
+  const dates=allData.map(d=>d["วันที่"]).sort();
+  document.getElementById("dateFrom").value=dates[0]||"";
+  document.getElementById("dateTo").value=dates[dates.length-1]||"";
+  refreshGff(""); refreshDevice("","");
+}
+
+function refreshGff(junc){
+  const sel=document.getElementById("filterGff");
+  sel.innerHTML='<option value="">ทั้งหมด</option>';
+  const gffs=[...new Set(allData.filter(d=>!junc||d["กฟฟ.จุดรวมงาน"]===junc).map(d=>d["กฟฟ."]))].filter(Boolean).sort();
+  gffs.forEach(g=>sel.add(new Option(g,g)));
+}
+function refreshDevice(junc,gff){
+  const sel=document.getElementById("filterDevice");
+  sel.innerHTML='<option value="">ทั้งหมด</option>';
+  const devs=[...new Set(allData.filter(d=>(!junc||d["กฟฟ.จุดรวมงาน"]===junc)&&(!gff||d["กฟฟ."]===gff)).map(d=>d["รหัสอุปกรณ์"]))].filter(Boolean).sort();
+  devs.forEach(d=>sel.add(new Option(d,d)));
+}
+function onJunctionChange(){const j=document.getElementById("filterJunction").value;refreshGff(j);refreshDevice(j,"");}
+function onGffChange(){const j=document.getElementById("filterJunction").value,g=document.getElementById("filterGff").value;refreshDevice(j,g);}
+
+function applyFilter(){
+  const junc=document.getElementById("filterJunction").value;
+  const gff=document.getElementById("filterGff").value;
+  const dev=document.getElementById("filterDevice").value;
+  const from=document.getElementById("dateFrom").value;
+  const to=document.getElementById("dateTo").value;
+  filteredData=allData.filter(d=>(!junc||d["กฟฟ.จุดรวมงาน"]===junc)&&(!gff||d["กฟฟ."]===gff)&&(!dev||d["รหัสอุปกรณ์"]===dev)&&(!from||d["วันที่"]>=from)&&(!to||d["วันที่"]<=to));
+  const parts=[];if(junc)parts.push(junc);if(gff)parts.push(gff);if(dev)parts.push(dev);
+  const af=document.getElementById("activeFilter");
+  if(parts.length){af.textContent="🔍 "+parts.join(" › ");af.style.display="block";}else af.style.display="none";
+  evtPage=1; renderAll(filteredData);
+}
+function resetFilter(){
+  ["filterJunction","filterGff","filterDevice"].forEach(id=>document.getElementById(id).value="");
+  refreshGff("");refreshDevice("","");
+  const dates=allData.map(d=>d["วันที่"]).sort();
+  document.getElementById("dateFrom").value=dates[0]||"";
+  document.getElementById("dateTo").value=dates[dates.length-1]||"";
+  document.getElementById("activeFilter").style.display="none";
+  filteredData=[...allData];evtPage=1;renderAll(filteredData);
+}
+
+function renderAll(data){
+  updateKPI(data); updateLineChart(data); updateBarChart(data);
+  updateHistChart(data); updatePieChart(data); updatePhaseChart(data);
+  updateTimeChart(data); updateStatusChart(data); updateCauseTrendChart(data);
+  updateHeatmap(data); applyTableFilter(); renderEventTable();
+}
+
+// ── KPI ──
+function getMode(arr){
+  if(!arr.length) return 0;
+  // จัดกลุ่มเป็น bin 100A
+  const bins={};
+  arr.forEach(v=>{const b=Math.floor(v/100)*100;bins[b]=(bins[b]||0)+1;});
+  const maxBin=Object.entries(bins).sort((a,b)=>b[1]-a[1])[0];
+  return maxBin?parseInt(maxBin[0]):0;
+}
+
+function updateKPI(data){
+  const reclose=data.filter(d=>d["สถานะ"]&&d["สถานะ"].includes("Reclose"));
+  const lockout=data.filter(d=>d["สถานะ"]==="Lockout");
+  const currents=data.map(d=>parseFloat(d["กระแส (A)"])).filter(v=>v>0);
+  const avg=currents.length?Math.round(currents.reduce((s,v)=>s+v,0)/currents.length):0;
+  const max=currents.length?Math.max(...currents):0;
+  const mode=getMode(currents);
+  document.getElementById("kpiTotal").textContent=data.length;
+  document.getElementById("kpiReclose").textContent=reclose.length;
+  document.getElementById("kpiLockout").textContent=lockout.length;
+  document.getElementById("kpiMode").textContent=mode?`${mode}-${mode+99}`:"N/A";
+  document.getElementById("kpiMax").textContent=max.toLocaleString();
+  document.getElementById("kpiAvg").textContent=avg.toLocaleString();
+}
+
+// ── Histogram ──
+function buildHistBins(currents,numBins=12){
+  if(!currents.length) return {bins:[],labels:[],modeIdx:0};
+  const min=Math.min(...currents),max=Math.max(...currents);
+  const binSize=Math.ceil((max-min)/numBins)||100;
+  const bins=Array(numBins).fill(0);
+  const labels=[];
+  for(let i=0;i<numBins;i++) labels.push(`${Math.round(min+i*binSize)}-${Math.round(min+(i+1)*binSize)}`);
+  currents.forEach(v=>{const idx=Math.min(Math.floor((v-min)/binSize),numBins-1);bins[idx]++;});
+  const modeIdx=bins.indexOf(Math.max(...bins));
+  return {bins,labels,modeIdx,binSize,min};
+}
+
+function updateHistChart(data){
+  const currents=data.map(d=>parseFloat(d["กระแส (A)"])).filter(v=>v>0);
+  const{bins,labels,modeIdx}=buildHistBins(currents);
+  const colors=bins.map((_,i)=>i===modeIdx?"#dc2626":"#1d4ed8");
+
+  // Current stats
+  if(currents.length){
+    const sorted=[...currents].sort((a,b)=>a-b);
+    const median=sorted[Math.floor(sorted.length/2)];
+    const q1=sorted[Math.floor(sorted.length*0.25)];
+    const q3=sorted[Math.floor(sorted.length*0.75)];
+    const mode=getMode(currents);
+    document.getElementById("currentStats").innerHTML=`
+      <div class="curr-stat"><div class="curr-stat-label">🔴 Mode Range (เกิดบ่อยสุด)</div><div class="curr-stat-value">${mode}-${mode+99} A</div><div class="curr-stat-sub">${bins[modeIdx]} ครั้ง</div></div>
+      <div class="curr-stat"><div class="curr-stat-label">Median (มัธยฐาน)</div><div class="curr-stat-value">${Math.round(median).toLocaleString()} A</div><div class="curr-stat-sub">ค่ากลางที่แท้จริง</div></div>
+      <div class="curr-stat"><div class="curr-stat-label">Q1 – Q3 (IQR)</div><div class="curr-stat-value">${Math.round(q1)}-${Math.round(q3)} A</div><div class="curr-stat-sub">ช่วงกลาง 50%</div></div>
+      <div class="curr-stat"><div class="curr-stat-label">Max</div><div class="curr-stat-value">${Math.max(...currents).toLocaleString()} A</div><div class="curr-stat-sub">กระแสสูงสุด</div></div>`;
+  }
+
+  if(charts.hist) charts.hist.destroy();
+  charts.hist=new Chart(document.getElementById("histChart"),{
+    type:"bar",
+    data:{labels,datasets:[{label:"จำนวนครั้ง",data:bins,backgroundColor:colors,borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:ctx=>`กระแส: ${ctx[0].label} A`,label:ctx=>`${ctx.raw} ครั้ง`}}},
+      scales:{x:{title:{display:true,text:'ช่วงกระแส (A)',font:{family:'Sarabun',size:11}},grid:{display:false},ticks:{font:{size:10}}},y:{beginAtZero:true,title:{display:true,text:'จำนวนครั้ง'}}}}
+  });
+}
+
+// ── Charts ──
+function mkChart(id,type,data,options){
+  const el=document.getElementById(id);
+  if(charts[id]) charts[id].destroy();
+  charts[id]=new Chart(el,{type,data,options:{responsive:true,maintainAspectRatio:false,...options}});
+}
+
+function updateLineChart(data){
+  const mc={};data.forEach(d=>{const m=new Date(d["วันที่"]).getMonth();mc[m]=(mc[m]||0)+1;});
+  const ms=Object.keys(mc).sort((a,b)=>a-b);
+  mkChart("lineChart","line",{labels:ms.map(m=>MONTHS[m]),datasets:[{label:"จำนวนครั้ง",data:ms.map(m=>mc[m]),borderColor:"#1d4ed8",backgroundColor:"rgba(29,78,216,0.1)",borderWidth:2.5,pointRadius:4,fill:true,tension:0.3}]},
+    {plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+}
+
+function updateBarChart(data){
+  const dc={};data.forEach(d=>{if(d["รหัสอุปกรณ์"])dc[d["รหัสอุปกรณ์"]]=(dc[d["รหัสอุปกรณ์"]]||0)+1;});
+  const sorted=Object.entries(dc).sort((a,b)=>b[1]-a[1]);
+  if(charts.bar) charts.bar.destroy();
+  charts.bar=new Chart(document.getElementById("barChart"),{
+    type:"bar",
+    data:{labels:sorted.map(([k])=>k),datasets:[{label:"จำนวนครั้ง",data:sorted.map(([,v])=>v),backgroundColor:"#1d4ed8",hoverBackgroundColor:"#1e40af",borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}},y:{beginAtZero:true}},
+      onClick:(evt,els)=>{if(els.length>0)openModal(sorted[els[0].index][0]);},
+      onHover:(evt,els)=>{evt.native.target.style.cursor=els.length?"pointer":"default";}}
+  });
+}
+
+function updatePieChart(data){
+  const cc={};data.forEach(d=>{if(d["สาเหตุ"])cc[d["สาเหตุ"]]=(cc[d["สาเหตุ"]]||0)+1;});
+  const sorted=Object.entries(cc).sort((a,b)=>b[1]-a[1]);
+  mkChart("pieChart","pie",{labels:sorted.map(([k])=>k),datasets:[{data:sorted.map(([,v])=>v),backgroundColor:sorted.map(([k])=>CAUSE_COLORS[k]||"#94a3b8"),borderWidth:2,borderColor:"#fff"}]},
+    {plugins:{legend:{position:"bottom",labels:{font:{family:"Sarabun"},boxWidth:12,padding:6}}}});
+}
+
+function updatePhaseChart(data){
+  const pm={"A/G":[],"B/G":[],"C/G":[],"อื่นๆ":[]};
+  data.forEach(d=>{const v=parseFloat(d["กระแส (A)"]);const ph=d["เฟส"]||"";if(!v||v<=0)return;if(pm[ph]!==undefined)pm[ph].push(v);else pm["อื่นๆ"].push(v);});
+  const labels=Object.keys(pm).filter(k=>pm[k].length>0);
+  const avgs=labels.map(k=>{const a=pm[k];return a.length?Math.round(a.reduce((s,v)=>s+v,0)/a.length):0;});
+  mkChart("phaseChart","bar",{labels,datasets:[{label:"กระแสเฉลี่ย (A)",data:avgs,backgroundColor:["#ef4444","#f97316","#eab308","#94a3b8"],borderRadius:5}]},
+    {plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+}
+
+function updateTimeChart(data){
+  const s={"ดึก (00-06)":0,"เช้า (06-12)":0,"บ่าย (12-18)":0,"เย็น (18-24)":0};
+  data.forEach(d=>{const h=parseInt((d["เวลา"]||"").split(":")[0])||0;
+    if(h<6)s["ดึก (00-06)"]++;else if(h<12)s["เช้า (06-12)"]++;else if(h<18)s["บ่าย (12-18)"]++;else s["เย็น (18-24)"]++;});
+  mkChart("timeChart","doughnut",{labels:Object.keys(s),datasets:[{data:Object.values(s),backgroundColor:["#1e3a8a","#f97316","#eab308","#6b7280"],borderWidth:2,borderColor:"#fff"}]},
+    {plugins:{legend:{position:"bottom",labels:{font:{family:"Sarabun"},boxWidth:12,padding:6}}}});
+}
+
+function updateStatusChart(data){
+  const sc={};data.forEach(d=>{if(d["สถานะ"])sc[d["สถานะ"]]=(sc[d["สถานะ"]]||0)+1;});
+  mkChart("statusChart","bar",{labels:Object.keys(sc),datasets:[{data:Object.values(sc),backgroundColor:Object.keys(sc).map(k=>STATUS_COLORS[k]||"#94a3b8"),borderRadius:5}]},
+    {plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+}
+
+function updateCauseTrendChart(data){
+  const causes=[...new Set(data.map(d=>d["สาเหตุ"]).filter(Boolean))].slice(0,4);
+  const months=[...new Set(data.map(d=>new Date(d["วันที่"]).getMonth()))].sort((a,b)=>a-b);
+  const datasets=causes.map(c=>({label:c,data:months.map(m=>data.filter(d=>new Date(d["วันที่"]).getMonth()===m&&d["สาเหตุ"]===c).length),borderColor:CAUSE_COLORS[c]||"#94a3b8",backgroundColor:(CAUSE_COLORS[c]||"#94a3b8")+"33",borderWidth:2,pointRadius:3,tension:0.3,fill:false}));
+  mkChart("causeTrendChart","line",{labels:months.map(m=>MONTHS[m]),datasets},{plugins:{legend:{position:"bottom",labels:{font:{family:"Sarabun"},boxWidth:12}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+}
+
+function updateHeatmap(data){
+  const causes=[...new Set(data.map(d=>d["สาเหตุ"]).filter(Boolean))].sort();
+  const months=[...new Set(data.map(d=>new Date(d["วันที่"]).getMonth()))].sort((a,b)=>a-b);
+  const maxVal=Math.max(...months.flatMap(m=>causes.map(c=>data.filter(d=>new Date(d["วันที่"]).getMonth()===m&&d["สาเหตุ"]===c).length)));
+  let html='<table style="border-collapse:collapse;font-size:12px;width:100%"><thead><tr><th style="padding:6px 10px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0">สาเหตุ \\ เดือน</th>';
+  months.forEach(m=>html+=`<th style="padding:6px 10px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;text-align:center">${MONTHS[m]}</th>`);
+  html+='<th style="padding:6px 10px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;text-align:center">รวม</th></tr></thead><tbody>';
+  causes.forEach(c=>{
+    html+=`<tr><td style="padding:6px 12px;font-weight:600;border:1px solid #e2e8f0">${c}</td>`;
+    let tot=0;
+    months.forEach(m=>{const v=data.filter(d=>new Date(d["วันที่"]).getMonth()===m&&d["สาเหตุ"]===c).length;tot+=v;const idx=maxVal>0?Math.min(Math.floor((v/maxVal)*6),6):0;const bg=HEAT_COLORS[idx];const fg=idx>=3?"white":"#1e3a8a";html+=`<td style="padding:6px 10px;text-align:center;background:${bg};color:${fg};font-weight:600;border:1px solid #e2e8f0">${v||""}</td>`;});
+    html+=`<td style="padding:6px 10px;text-align:center;font-weight:700;color:#1e3a8a;border:1px solid #e2e8f0">${tot}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById("heatmapWrap").innerHTML=html;
+}
+
+// ── Table ──
+function applyTableFilter(){
+  const wt=document.getElementById("tblWorktype").value;
+  const st=document.getElementById("tblStatus").value;
+  const sort=document.getElementById("tblSort").value;
+  let data=filteredData.filter(d=>(!wt||d["รูปแบบการทำงาน"]===wt)&&(!st||d["สถานะ"]===st));
+
+  const dm={};
+  data.forEach(d=>{const dev=d["รหัสอุปกรณ์"];if(!dev)return;if(!dm[dev])dm[dev]={gff:d["กฟฟ."],rows:[]};dm[dev].rows.push(d);});
+
+  let entries=Object.entries(dm);
+  if(sort==="count_desc") entries.sort((a,b)=>b[1].rows.length-a[1].rows.length);
+  else if(sort==="count_asc") entries.sort((a,b)=>a[1].rows.length-b[1].rows.length);
+  else if(sort==="device_asc") entries.sort((a,b)=>a[0].localeCompare(b[0]));
+  else if(sort==="device_desc") entries.sort((a,b)=>b[0].localeCompare(a[0]));
+  else if(sort==="current_desc") entries.sort((a,b)=>{const ma=Math.max(...b[1].rows.map(r=>parseFloat(r["กระแส (A)"])||0));const mb=Math.max(...a[1].rows.map(r=>parseFloat(r["กระแส (A)"])||0));return ma-mb;});
+  else if(sort==="lockout_desc") entries.sort((a,b)=>b[1].rows.filter(r=>r["สถานะ"]==="Lockout").length-a[1].rows.filter(r=>r["สถานะ"]==="Lockout").length);
+
+  const tbody=document.getElementById("tableBody");
+  tbody.innerHTML="";
+  entries.forEach(([dev,info])=>{
+    const rows=info.rows;
+    const reclose=rows.filter(r=>r["สถานะ"]&&r["สถานะ"].includes("Reclose")).length;
+    const lockout=rows.filter(r=>r["สถานะ"]==="Lockout").length;
+    const currents=rows.map(r=>parseFloat(r["กระแส (A)"])).filter(v=>v>0);
+    const modeVal=getMode(currents);
+    const max=currents.length?Math.max(...currents):"-";
+    const cm={};rows.forEach(r=>{if(r["สาเหตุ"])cm[r["สาเหตุ"]]=(cm[r["สาเหตุ"]]||0)+1;});
+    const topCause=Object.entries(cm).sort((a,b)=>b[1]-a[1])[0]?.[0]||"-";
+    const color=CAUSE_COLORS[topCause]||"#94a3b8";
+    const pending=rows.filter(r=>r["สถานะการแก้ไข"]&&r["สถานะการแก้ไข"].includes("รอ")).length;
+    tbody.innerHTML+=`<tr onclick="openModal('${dev}')" style="cursor:pointer">
+      <td><strong style="color:#1d4ed8">${dev}</strong></td>
+      <td style="color:#475569">${info.gff||"-"}</td>
+      <td><strong>${rows.length}</strong></td>
+      <td style="color:#16a34a">${reclose}</td>
+      <td style="color:#dc2626">${lockout}</td>
+      <td style="color:#7c3aed;font-weight:600">${modeVal?`${modeVal}-${modeVal+99}`:"N/A"}</td>
+      <td>${typeof max==="number"?max.toLocaleString():max}</td>
+      <td><span class="badge" style="background:${color}22;color:${color}">${topCause}</span></td>
+      <td>${pending>0?`<span style="color:#dc2626;font-weight:600">${pending}</span>`:'<span style="color:#16a34a">-</span>'}</td>
+    </tr>`;
+  });
+}
+
+// ── Event Table ──
+function renderEventTable(){
+  const sort=document.getElementById("evtSort").value;
+  let data=[...filteredData];
+  if(sort==="date_desc") data.sort((a,b)=>b["วันที่"].localeCompare(a["วันที่"])||b["เวลา"].localeCompare(a["เวลา"]));
+  else if(sort==="date_asc") data.sort((a,b)=>a["วันที่"].localeCompare(b["วันที่"])||a["เวลา"].localeCompare(b["เวลา"]));
+  else if(sort==="current_desc") data.sort((a,b)=>(parseFloat(b["กระแส (A)"])||0)-(parseFloat(a["กระแส (A)"])||0));
+  else if(sort==="device_asc") data.sort((a,b)=>(a["รหัสอุปกรณ์"]||"").localeCompare(b["รหัสอุปกรณ์"]||""));
+
+  document.getElementById("evtCount").textContent=`ทั้งหมด ${data.length} รายการ`;
+  const total=Math.ceil(data.length/EVT_PER_PAGE);
+  const page=data.slice((evtPage-1)*EVT_PER_PAGE,evtPage*EVT_PER_PAGE);
+
+  document.getElementById("eventTableBody").innerHTML=page.map(r=>`
+    <tr>
+      <td>${r["วันที่"]||"-"}</td><td>${r["เวลา"]||"-"}</td>
+      <td style="color:#475569">${r["กฟฟ."]||"-"}</td>
+      <td style="color:#1d4ed8;font-weight:600">${r["รหัสอุปกรณ์"]||"-"}</td>
+      <td>${r["รูปแบบการทำงาน"]||"-"}</td>
+      <td style="color:${STATUS_COLORS[r["สถานะ"]]||"#333"}">${r["สถานะ"]||"-"}</td>
+      <td>${r["เฟส"]||"-"}</td>
+      <td style="font-weight:600">${r["กระแส (A)"]||"-"}</td>
+      <td>${r["สาเหตุ"]||"-"}</td>
+      <td style="font-size:11px;max-width:150px;word-break:break-word">${r["รายละเอียด"]||"-"}</td>
+      <td>${r["สถานะการแก้ไข"]||"-"}</td>
+    </tr>`).join("");
+
+  // Pagination
+  let pg='';
+  if(total>1){
+    pg+=`<button class="page-btn" onclick="changePage(${evtPage-1})" ${evtPage===1?"disabled":""}>‹</button>`;
+    for(let i=1;i<=total;i++){
+      if(i===1||i===total||Math.abs(i-evtPage)<=2) pg+=`<button class="page-btn ${i===evtPage?"active":""}" onclick="changePage(${i})">${i}</button>`;
+      else if(Math.abs(i-evtPage)===3) pg+='<span style="padding:0 4px">…</span>';
+    }
+    pg+=`<button class="page-btn" onclick="changePage(${evtPage+1})" ${evtPage===total?"disabled":""}>›</button>`;
+  }
+  document.getElementById("pagination").innerHTML=pg;
+}
+function changePage(p){evtPage=p;renderEventTable();window.scrollTo({top:document.getElementById("eventTableBody").closest(".table-card").offsetTop-80,behavior:"smooth"});}
+
+// ── Modal ──
+function openModal(device){
+  currentModalDevice=device;
+  currentModalRows=filteredData.filter(d=>d["รหัสอุปกรณ์"]===device);
+  const rows=currentModalRows;
+  const reclose=rows.filter(r=>r["สถานะ"]&&r["สถานะ"].includes("Reclose")).length;
+  const lockout=rows.filter(r=>r["สถานะ"]==="Lockout").length;
+  const currents=rows.map(r=>parseFloat(r["กระแส (A)"])).filter(v=>v>0);
+  const modeVal=getMode(currents);
+
+  document.getElementById("modalTitle").textContent=`📌 ${device} — ${rows[0]?.["กฟฟ."]||""}`;
+  document.getElementById("mTotal").textContent=rows.length;
+  document.getElementById("mReclose").textContent=reclose;
+  document.getElementById("mLockout").textContent=lockout;
+  document.getElementById("mMode").textContent=modeVal?`${modeVal}-${modeVal+99} A`:"N/A";
+
+  // Cause chart
+  const cm={};rows.forEach(r=>{if(r["สาเหตุ"])cm[r["สาเหตุ"]]=(cm[r["สาเหตุ"]]||0)+1;});
+  const sc=Object.entries(cm).sort((a,b)=>b[1]-a[1]);
+  if(modalCharts.cause) modalCharts.cause.destroy();
+  modalCharts.cause=new Chart(document.getElementById("modalCauseChart"),{type:"bar",
+    data:{labels:sc.map(([k])=>k),datasets:[{data:sc.map(([,v])=>v),backgroundColor:sc.map(([k])=>CAUSE_COLORS[k]||"#94a3b8"),borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}});
+
+  // Histogram
+  const{bins,labels,modeIdx}=buildHistBins(currents);
+  const colors=bins.map((_,i)=>i===modeIdx?"#dc2626":"#1d4ed8");
+  if(modalCharts.hist) modalCharts.hist.destroy();
+  modalCharts.hist=new Chart(document.getElementById("modalHistChart"),{type:"bar",
+    data:{labels,datasets:[{label:"จำนวนครั้ง",data:bins,backgroundColor:colors,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{title:ctx=>`${ctx[0].label} A`,label:ctx=>`${ctx.raw} ครั้ง`}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{beginAtZero:true}}}});
+
+  renderModalTable();
+  document.getElementById("modalOverlay").classList.add("active");
+}
+
+function renderModalTable(){
+  const sort=document.getElementById("modalSort").value;
+  let rows=[...currentModalRows];
+  if(sort==="date_desc") rows.sort((a,b)=>b["วันที่"].localeCompare(a["วันที่"])||b["เวลา"].localeCompare(a["เวลา"]));
+  else if(sort==="date_asc") rows.sort((a,b)=>a["วันที่"].localeCompare(b["วันที่"]));
+  else if(sort==="current_desc") rows.sort((a,b)=>(parseFloat(b["กระแส (A)"])||0)-(parseFloat(a["กระแส (A)"])||0));
+
+  document.getElementById("modalTableBody").innerHTML=rows.map(r=>`
+    <tr>
+      <td>${r["วันที่"]||"-"}</td><td>${r["เวลา"]||"-"}</td>
+      <td>${r["รูปแบบการทำงาน"]||"-"}</td>
+      <td style="color:${STATUS_COLORS[r["สถานะ"]]||"#333"}">${r["สถานะ"]||"-"}</td>
+      <td>${r["เฟส"]||"-"}</td>
+      <td style="font-weight:600;color:${parseFloat(r["กระแส (A)"])>1000?"#dc2626":"#333"}">${r["กระแส (A)"]||"-"}</td>
+      <td>${r["สาเหตุ"]||"-"}</td>
+      <td style="font-size:11px;max-width:160px;word-break:break-word">${r["รายละเอียด"]||"-"}</td>
+      <td>${r["สถานะการแก้ไข"]||"-"}</td>
+    </tr>`).join("");
+}
+
+function closeModal(e){if(e.target===document.getElementById("modalOverlay"))closeModalDirect();}
+function closeModalDirect(){document.getElementById("modalOverlay").classList.remove("active");}
+
+// ── Export ──
+function exportToExcel(data,filename,headers,rowFn){
+  const ws=XLSX.utils.aoa_to_sheet([headers,...data.map(rowFn)]);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"ข้อมูล");
+  XLSX.writeFile(wb,filename);
+}
+
+function exportMainTable(){
+  const headers=["รหัสอุปกรณ์","กฟฟ.","ทั้งหมด","Reclose","Lockout","กระแส Mode","กระแสสูงสุด","สาเหตุหลัก"];
+  // รวบรวมจาก filteredData
+  const dm={};
+  filteredData.forEach(d=>{const dev=d["รหัสอุปกรณ์"];if(!dev)return;if(!dm[dev])dm[dev]={gff:d["กฟฟ."],rows:[]};dm[dev].rows.push(d);});
+  const rows=Object.entries(dm).map(([dev,info])=>{
+    const r=info.rows;
+    const curr=r.map(x=>parseFloat(x["กระแส (A)"])).filter(v=>v>0);
+    const m=getMode(curr);const max=curr.length?Math.max(...curr):0;
+    const cm={};r.forEach(x=>{if(x["สาเหตุ"])cm[x["สาเหตุ"]]=(cm[x["สาเหตุ"]]||0)+1;});
+    const top=Object.entries(cm).sort((a,b)=>b[1]-a[1])[0]?.[0]||"-";
+    return [dev,info.gff||"",r.length,r.filter(x=>x["สถานะ"]&&x["สถานะ"].includes("Reclose")).length,r.filter(x=>x["สถานะ"]==="Lockout").length,m?`${m}-${m+99} A`:"N/A",max,top];
+  });
+  exportToExcel(rows,`Recloser_สรุปอุปกรณ์_${new Date().toLocaleDateString("th-TH")}.xlsx`,headers,r=>r);
+}
+
+function exportEventTable(){
+  const headers=["วันที่","เวลา","กฟฟ.จุดรวมงาน","กฟฟ.","รหัสอุปกรณ์","รูปแบบการทำงาน","สถานะ","เฟส","กระแส (A)","สาเหตุ","รายละเอียด","สถานะการแก้ไข"];
+  exportToExcel(filteredData,`Recloser_รายการ_${new Date().toLocaleDateString("th-TH")}.xlsx`,headers,
+    r=>[r["วันที่"],r["เวลา"],r["กฟฟ.จุดรวมงาน"],r["กฟฟ."],r["รหัสอุปกรณ์"],r["รูปแบบการทำงาน"],r["สถานะ"],r["เฟส"],r["กระแส (A)"],r["สาเหตุ"],r["รายละเอียด"],r["สถานะการแก้ไข"]]);
+}
+
+function exportModalData(){
+  const headers=["วันที่","เวลา","รูปแบบการทำงาน","สถานะ","เฟส","กระแส (A)","สาเหตุ","รายละเอียด","สถานะการแก้ไข"];
+  exportToExcel(currentModalRows,`Recloser_${currentModalDevice}_${new Date().toLocaleDateString("th-TH")}.xlsx`,headers,
+    r=>[r["วันที่"],r["เวลา"],r["รูปแบบการทำงาน"],r["สถานะ"],r["เฟส"],r["กระแส (A)"],r["สาเหตุ"],r["รายละเอียด"],r["สถานะการแก้ไข"]]);
+}
+
+loadData();
+setInterval(loadData,5*60*1000);
+</script>
+</body>
+</html>
