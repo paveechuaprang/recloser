@@ -217,69 +217,63 @@ body{font-family:'Sarabun',sans-serif;background:#f1f5f9;min-height:100vh;}
     <div style="overflow-x:auto" id="heatmapWrap"></div>
   </div>
 
-  <!-- ตาราง -->
-  <div class="section-title">📋 สรุปรายอุปกรณ์</div>
+  <!-- ตารางอัจฉริยะ (รวมเป็นตารางเดียว) -->
+  <div class="section-title">📋 ตารางข้อมูล</div>
   <div class="table-card">
     <div class="table-toolbar">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select id="tblWorktype" onchange="applyTableFilter()">
+        <!-- โหมด -->
+        <select id="tableMode" onchange="onTableModeChange()">
+          <option value="summary">สรุปรายอุปกรณ์</option>
+          <option value="detail">รายการเหตุการณ์</option>
+        </select>
+        <!-- Filter รูปแบบ -->
+        <select id="tblWorktype" onchange="renderSmartTable()">
           <option value="">ทุกรูปแบบการทำงาน</option>
           <option>T/R1</option><option>T/R2</option><option>T/L</option>
         </select>
-        <select id="tblStatus" onchange="applyTableFilter()">
+        <!-- Filter สถานะ -->
+        <select id="tblStatus" onchange="renderSmartTable()">
           <option value="">ทุกสถานะ</option>
           <option>Reclose สำเร็จ</option><option>Lockout</option><option>ทดสอบ</option>
         </select>
-        <select id="tblSort" onchange="applyTableFilter()">
+        <!-- Sort -->
+        <select id="tblSort" onchange="renderSmartTable()">
           <option value="count_desc">เรียงตามจำนวน (มาก→น้อย)</option>
           <option value="count_asc">เรียงตามจำนวน (น้อย→มาก)</option>
           <option value="device_asc">เรียงตามรหัสอุปกรณ์ (A→Z)</option>
           <option value="device_desc">เรียงตามรหัสอุปกรณ์ (Z→A)</option>
-          <option value="current_desc">เรียงตามกระแสสูงสุด (มาก→น้อย)</option>
+          <option value="date_desc">วันที่ล่าสุดก่อน</option>
+          <option value="date_asc">วันที่เก่าก่อน</option>
+          <option value="current_desc">กระแสสูงสุดก่อน</option>
           <option value="lockout_desc">เรียงตาม Lockout (มาก→น้อย)</option>
         </select>
+        <span id="tblCount" style="font-size:12px;color:#64748b"></span>
       </div>
-      <button class="btn-export" onclick="exportMainTable()">
-        📥 Export Excel
-      </button>
+      <button class="btn-export" id="btnExport" onclick="exportSmartTable()">📥 Export Excel</button>
     </div>
-    <table class="data-table">
-      <thead>
-        <tr>
+
+    <!-- หัวตาราง Summary -->
+    <div id="summaryTableWrap" style="overflow-x:auto">
+      <table class="data-table">
+        <thead><tr>
           <th>รหัสอุปกรณ์</th><th>กฟฟ.</th><th>ทั้งหมด</th>
           <th>Reclose</th><th>Lockout</th>
           <th>กระแส Mode (A)</th><th>กระแสสูงสุด (A)</th>
           <th>สาเหตุหลัก</th><th>รอแก้ไข</th>
-        </tr>
-      </thead>
-      <tbody id="tableBody"></tbody>
-    </table>
-  </div>
-
-  <!-- รายการทั้งหมด -->
-  <div class="section-title">📄 รายการเหตุการณ์ทั้งหมด</div>
-  <div class="table-card">
-    <div class="table-toolbar">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <select id="evtSort" onchange="renderEventTable()">
-          <option value="date_desc">วันที่ล่าสุดก่อน</option>
-          <option value="date_asc">วันที่เก่าก่อน</option>
-          <option value="current_desc">กระแสสูงสุดก่อน</option>
-          <option value="device_asc">เรียงตามอุปกรณ์</option>
-        </select>
-        <span id="evtCount" style="font-size:12px;color:#64748b"></span>
-      </div>
-      <button class="btn-export" onclick="exportEventTable()">📥 Export Excel</button>
+        </tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
     </div>
-    <div style="overflow-x:auto">
+
+    <!-- หัวตาราง Detail -->
+    <div id="detailTableWrap" style="overflow-x:auto;display:none">
       <table class="data-table">
-        <thead>
-          <tr>
-            <th>วันที่</th><th>เวลา</th><th>กฟฟ.</th><th>รหัสอุปกรณ์</th>
-            <th>รูปแบบ</th><th>สถานะ</th><th>เฟส</th>
-            <th>กระแส (A)</th><th>สาเหตุ</th><th>รายละเอียด</th><th>สถานะแก้ไข</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>วันที่</th><th>เวลา</th><th>กฟฟ.</th><th>รหัสอุปกรณ์</th>
+          <th>รูปแบบ</th><th>สถานะ</th><th>เฟส</th>
+          <th>กระแส (A)</th><th>สาเหตุ</th><th>รายละเอียด</th><th>สถานะแก้ไข</th>
+        </tr></thead>
         <tbody id="eventTableBody"></tbody>
       </table>
     </div>
@@ -410,8 +404,131 @@ function renderAll(data){
   updateKPI(data); updateLineChart(data); updateBarChart(data);
   updateHistChart(data); updatePieChart(data); updatePhaseChart(data);
   updateTimeChart(data); updateStatusChart(data); updateCauseTrendChart(data);
-  updateHeatmap(data); applyTableFilter(); renderEventTable();
+  updateHeatmap(data); renderSmartTable();
 }
+
+// ── ตารางอัจฉริยะ (รวมเป็นตารางเดียว) ──
+function onTableModeChange(){
+  evtPage=1;
+  const mode=document.getElementById("tableMode").value;
+  // ปรับ sort options ตามโหมด
+  const sortSel=document.getElementById("tblSort");
+  if(mode==="summary"){
+    sortSel.innerHTML=`
+      <option value="count_desc">เรียงตามจำนวน (มาก→น้อย)</option>
+      <option value="count_asc">เรียงตามจำนวน (น้อย→มาก)</option>
+      <option value="device_asc">เรียงตามรหัสอุปกรณ์ (A→Z)</option>
+      <option value="device_desc">เรียงตามรหัสอุปกรณ์ (Z→A)</option>
+      <option value="current_desc">เรียงตามกระแสสูงสุด (มาก→น้อย)</option>
+      <option value="lockout_desc">เรียงตาม Lockout (มาก→น้อย)</option>`;
+  } else {
+    sortSel.innerHTML=`
+      <option value="date_desc">วันที่ล่าสุดก่อน</option>
+      <option value="date_asc">วันที่เก่าก่อน</option>
+      <option value="current_desc">กระแสสูงสุดก่อน</option>
+      <option value="device_asc">เรียงตามอุปกรณ์</option>`;
+  }
+  renderSmartTable();
+}
+
+function renderSmartTable(){
+  const mode=document.getElementById("tableMode").value;
+  document.getElementById("summaryTableWrap").style.display=mode==="summary"?"block":"none";
+  document.getElementById("detailTableWrap").style.display=mode==="detail"?"block":"none";
+  if(mode==="summary") renderSummaryTable();
+  else renderDetailTable();
+}
+
+function getFilteredRows(){
+  const wt=document.getElementById("tblWorktype").value;
+  const st=document.getElementById("tblStatus").value;
+  return filteredData.filter(d=>(!wt||d["รูปแบบการทำงาน"]===wt)&&(!st||d["สถานะ"]===st));
+}
+
+function renderSummaryTable(){
+  const sort=document.getElementById("tblSort").value;
+  const data=getFilteredRows();
+  const dm={};
+  data.forEach(d=>{const dev=d["รหัสอุปกรณ์"];if(!dev)return;if(!dm[dev])dm[dev]={gff:d["กฟฟ."],rows:[]};dm[dev].rows.push(d);});
+  let entries=Object.entries(dm);
+  if(sort==="count_desc") entries.sort((a,b)=>b[1].rows.length-a[1].rows.length);
+  else if(sort==="count_asc") entries.sort((a,b)=>a[1].rows.length-b[1].rows.length);
+  else if(sort==="device_asc") entries.sort((a,b)=>a[0].localeCompare(b[0]));
+  else if(sort==="device_desc") entries.sort((a,b)=>b[0].localeCompare(a[0]));
+  else if(sort==="current_desc") entries.sort((a,b)=>Math.max(...b[1].rows.map(r=>parseFloat(r["กระแส (A)"])||0))-Math.max(...a[1].rows.map(r=>parseFloat(r["กระแส (A)"])||0)));
+  else if(sort==="lockout_desc") entries.sort((a,b)=>b[1].rows.filter(r=>r["สถานะ"]==="Lockout").length-a[1].rows.filter(r=>r["สถานะ"]==="Lockout").length);
+  document.getElementById("tblCount").textContent=`${entries.length} อุปกรณ์`;
+  document.getElementById("pagination").innerHTML="";
+  const tbody=document.getElementById("tableBody");
+  tbody.innerHTML=entries.map(([dev,info])=>{
+    const rows=info.rows;
+    const reclose=rows.filter(r=>r["สถานะ"]&&r["สถานะ"].includes("Reclose")).length;
+    const lockout=rows.filter(r=>r["สถานะ"]==="Lockout").length;
+    const currents=rows.map(r=>parseFloat(r["กระแส (A)"])).filter(v=>v>0);
+    const modeVal=getMode(currents);
+    const max=currents.length?Math.max(...currents):"-";
+    const cm={};rows.forEach(r=>{if(r["สาเหตุ"])cm[r["สาเหตุ"]]=(cm[r["สาเหตุ"]]||0)+1;});
+    const topCause=Object.entries(cm).sort((a,b)=>b[1]-a[1])[0]?.[0]||"-";
+    const color=CAUSE_COLORS[topCause]||"#94a3b8";
+    const pending=rows.filter(r=>r["สถานะการแก้ไข"]&&r["สถานะการแก้ไข"].includes("รอ")).length;
+    return `<tr onclick="openModal('${dev}')" style="cursor:pointer">
+      <td><strong style="color:#1d4ed8">${dev}</strong></td>
+      <td style="color:#475569">${info.gff||"-"}</td>
+      <td><strong>${rows.length}</strong></td>
+      <td style="color:#16a34a">${reclose}</td>
+      <td style="color:#dc2626">${lockout}</td>
+      <td style="color:#7c3aed;font-weight:600">${modeVal?`${modeVal}-${modeVal+99}`:"N/A"}</td>
+      <td>${typeof max==="number"?max.toLocaleString():max}</td>
+      <td><span class="badge" style="background:${color}22;color:${color}">${topCause}</span></td>
+      <td>${pending>0?`<span style="color:#dc2626;font-weight:600">${pending}</span>`:'<span style="color:#16a34a">-</span>'}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderDetailTable(){
+  const sort=document.getElementById("tblSort").value;
+  let data=getFilteredRows();
+  if(sort==="date_desc") data.sort((a,b)=>b["วันที่"].localeCompare(a["วันที่"])||b["เวลา"].localeCompare(a["เวลา"]));
+  else if(sort==="date_asc") data.sort((a,b)=>a["วันที่"].localeCompare(b["วันที่"]));
+  else if(sort==="current_desc") data.sort((a,b)=>(parseFloat(b["กระแส (A)"])||0)-(parseFloat(a["กระแส (A)"])||0));
+  else if(sort==="device_asc") data.sort((a,b)=>(a["รหัสอุปกรณ์"]||"").localeCompare(b["รหัสอุปกรณ์"]||""));
+  document.getElementById("tblCount").textContent=`${data.length} รายการ`;
+  const total=Math.ceil(data.length/EVT_PER_PAGE);
+  const page=data.slice((evtPage-1)*EVT_PER_PAGE,evtPage*EVT_PER_PAGE);
+  document.getElementById("eventTableBody").innerHTML=page.map(r=>`
+    <tr>
+      <td>${r["วันที่"]||"-"}</td><td>${r["เวลา"]||"-"}</td>
+      <td style="color:#475569">${r["กฟฟ."]||"-"}</td>
+      <td style="color:#1d4ed8;font-weight:600">${r["รหัสอุปกรณ์"]||"-"}</td>
+      <td>${r["รูปแบบการทำงาน"]||"-"}</td>
+      <td style="color:${STATUS_COLORS[r["สถานะ"]]||"#333"}">${r["สถานะ"]||"-"}</td>
+      <td>${r["เฟส"]||"-"}</td>
+      <td style="font-weight:600;color:${parseFloat(r["กระแส (A)"])>1000?"#dc2626":"#333"}">${r["กระแส (A)"]||"-"}</td>
+      <td>${r["สาเหตุ"]||"-"}</td>
+      <td style="font-size:11px;max-width:150px;word-break:break-word">${r["รายละเอียด"]||"-"}</td>
+      <td>${r["สถานะการแก้ไข"]||"-"}</td>
+    </tr>`).join("");
+  let pg='';
+  if(total>1){
+    pg+=`<button class="page-btn" onclick="changePage(${evtPage-1})" ${evtPage===1?"disabled":""}>‹</button>`;
+    for(let i=1;i<=total;i++){
+      if(i===1||i===total||Math.abs(i-evtPage)<=2) pg+=`<button class="page-btn ${i===evtPage?"active":""}" onclick="changePage(${i})">${i}</button>`;
+      else if(Math.abs(i-evtPage)===3) pg+='<span style="padding:0 4px">…</span>';
+    }
+    pg+=`<button class="page-btn" onclick="changePage(${evtPage+1})" ${evtPage===total?"disabled":""}>›</button>`;
+  }
+  document.getElementById("pagination").innerHTML=pg;
+}
+
+function exportSmartTable(){
+  const mode=document.getElementById("tableMode").value;
+  if(mode==="summary") exportMainTable();
+  else exportEventTable();
+}
+
+// ── ลบฟังก์ชันเดิม (ถูกแทนด้วยอันใหม่) ──
+function applyTableFilter(){ renderSummaryTable(); }
+function renderEventTable(){ if(document.getElementById("tableMode").value==="detail") renderDetailTable(); }
 
 // ── KPI ──
 function getMode(arr){
